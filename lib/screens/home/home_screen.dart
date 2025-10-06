@@ -4,6 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/pet_provider.dart';
 import '../../models/pet_model.dart';
 import '../pets/add_pet_screen.dart';
+import '../pets/pet_detail_screen.dart'; // <-- importamos la pantalla de detalle
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -12,6 +13,13 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final petProvider = Provider.of<PetProvider>(context, listen: false);
+
+    // Si no hay usuario logueado, muestra un loader
+    if (authProvider.user == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -39,19 +47,44 @@ class HomeScreen extends StatelessWidget {
           final pets = snapshot.data!;
 
           return ListView.builder(
+            padding: const EdgeInsets.all(8.0),
             itemCount: pets.length,
             itemBuilder: (context, index) {
               final pet = pets[index];
+
               return Card(
+                margin: const EdgeInsets.symmetric(vertical: 6.0),
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: ListTile(
-                  title: Text(pet.name),
-                  subtitle: Text(pet.species),
+                  contentPadding: const EdgeInsets.symmetric(
+                      vertical: 10.0, horizontal: 16.0),
+                  title: Text(
+                    pet.name,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  subtitle: Text(
+                    pet.species,
+                    style: const TextStyle(fontSize: 14),
+                  ),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete, color: Colors.red),
                     onPressed: () async {
                       await petProvider.deletePet(pet.id);
                     },
                   ),
+                  onTap: () {
+                    // Navegar a la pantalla de detalle al tocar la tarjeta
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PetDetailScreen(pet: pet),
+                      ),
+                    );
+                  },
                 ),
               );
             },
