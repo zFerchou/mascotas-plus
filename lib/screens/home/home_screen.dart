@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/pet_provider.dart';
 import '../../models/pet_model.dart';
 import '../pets/add_pet_screen.dart';
-import '../pets/pet_detail_screen.dart'; // <-- importamos la pantalla de detalle
+import '../pets/pet_detail_screen.dart';
+import '../settings/profile_screen.dart'; // 👈 Importamos el nuevo perfil
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -14,7 +16,6 @@ class HomeScreen extends StatelessWidget {
     final authProvider = Provider.of<AuthProvider>(context);
     final petProvider = Provider.of<PetProvider>(context, listen: false);
 
-    // Si no hay usuario logueado, muestra un loader
     if (authProvider.user == null) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -23,80 +24,137 @@ class HomeScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mis Mascotas'),
+        title: Text(
+          '🐾 Mis Mascotas',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        backgroundColor: Colors.teal,
         actions: [
+          // 👤 Botón de perfil
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.account_circle, color: Colors.white),
+            tooltip: 'Ver Perfil',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileScreen()),
+              );
+            },
+          ),
+          // 🚪 Botón de logout
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            tooltip: 'Cerrar Sesión',
             onPressed: () async {
               await authProvider.logout();
             },
           ),
         ],
       ),
-      body: StreamBuilder<List<PetModel>>(
-        stream: petProvider.getPets(authProvider.user!.uid),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFe0f7fa), Color(0xFFb2ebf2)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: StreamBuilder<List<PetModel>>(
+          stream: petProvider.getPets(authProvider.user!.uid),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No tienes mascotas registradas.'));
-          }
-
-          final pets = snapshot.data!;
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(8.0),
-            itemCount: pets.length,
-            itemBuilder: (context, index) {
-              final pet = pets[index];
-
-              return Card(
-                margin: const EdgeInsets.symmetric(vertical: 6.0),
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                      vertical: 10.0, horizontal: 16.0),
-                  title: Text(
-                    pet.name,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 18),
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return Center(
+                child: Text(
+                  'Aún no tienes mascotas registradas 🐾',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    color: Colors.teal[900],
                   ),
-                  subtitle: Text(
-                    pet.species,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () async {
-                      await petProvider.deletePet(pet.id);
-                    },
-                  ),
-                  onTap: () {
-                    // Navegar a la pantalla de detalle al tocar la tarjeta
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => PetDetailScreen(pet: pet),
-                      ),
-                    );
-                  },
                 ),
               );
-            },
-          );
-        },
+            }
+
+            final pets = snapshot.data!;
+
+            return ListView.builder(
+              padding: const EdgeInsets.all(12.0),
+              itemCount: pets.length,
+              itemBuilder: (context, index) {
+                final pet = pets[index];
+
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => PetDetailScreen(pet: pet)),
+                    );
+                  },
+                  child: Card(
+                    margin: const EdgeInsets.symmetric(vertical: 8.0),
+                    elevation: 6,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF80deea), Color(0xFF26c6da)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(16),
+                        leading: CircleAvatar(
+                          radius: 28,
+                          backgroundColor: Colors.white,
+                          backgroundImage: AssetImage(
+                            'assets/icons/${pet.species.toLowerCase()}.png',
+                          ),
+                        ),
+                        title: Text(
+                          pet.name,
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: Colors.white,
+                          ),
+                        ),
+                        subtitle: Text(
+                          pet.species,
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            color: Colors.white70,
+                          ),
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete_forever, color: Colors.white),
+                          onPressed: () async {
+                            await petProvider.deletePet(pet.id);
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: Colors.teal,
+        icon: const Icon(Icons.add),
+        label: const Text('Agregar Mascota'),
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const AddPetScreen()),
         ),
-        child: const Icon(Icons.add),
       ),
     );
   }
