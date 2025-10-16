@@ -1,20 +1,22 @@
 class PetModel {
   String id;
-  String ownerId;
+  String ownerId; // 🔹 Quita "final" aquí
   String name;
   String species;
-  String? birthDate;
+  String birthDate;
   List<Map<String, dynamic>> vaccines;
   List<Map<String, dynamic>> appointments;
+  bool isAdoptable;
 
   PetModel({
     required this.id,
     required this.ownerId,
     required this.name,
     required this.species,
-    this.birthDate,
-    this.vaccines = const [],
-    this.appointments = const [],
+    required this.birthDate,
+    required this.vaccines,
+    required this.appointments,
+    required this.isAdoptable,
   });
 
   Map<String, dynamic> toMap() {
@@ -26,6 +28,7 @@ class PetModel {
       'birthDate': birthDate,
       'vaccines': vaccines,
       'appointments': appointments,
+      'isAdoptable': isAdoptable,
     };
   }
 
@@ -35,9 +38,10 @@ class PetModel {
       ownerId: map['ownerId'] ?? '',
       name: map['name'] ?? '',
       species: map['species'] ?? '',
-      birthDate: map['birthDate'],
+      birthDate: map['birthDate'] ?? '',
       vaccines: List<Map<String, dynamic>>.from(map['vaccines'] ?? []),
       appointments: List<Map<String, dynamic>>.from(map['appointments'] ?? []),
+      isAdoptable: map['isAdoptable'] ?? false,
     );
   }
 }

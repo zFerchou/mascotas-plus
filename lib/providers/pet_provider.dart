@@ -12,6 +12,11 @@ class PetProvider with ChangeNotifier {
     return _firestore.getPetsByUser(ownerId);
   }
 
+  // Obtener mascotas disponibles para adopción (excluyendo las propias)
+  Stream<List<PetModel>> getAdoptablePets(String currentUserId) {
+    return _firestore.getPetsForAdoption(currentUserId);
+  }
+
   // Agregar mascota con todos los campos necesarios
   Future<void> addPet({
     required String ownerId,
@@ -20,6 +25,7 @@ class PetProvider with ChangeNotifier {
     String? birthDate,
     List<Map<String, dynamic>>? vaccines,
     List<Map<String, dynamic>>? appointments,
+    bool isAdoptable = false, // Nueva propiedad para adopción
   }) async {
     final newPet = PetModel(
       id: _uuid.v4(),
@@ -29,13 +35,31 @@ class PetProvider with ChangeNotifier {
       birthDate: birthDate ?? '',
       vaccines: vaccines ?? [],
       appointments: appointments ?? [],
+      isAdoptable: isAdoptable,
     );
 
     await _firestore.addPet(newPet);
+    notifyListeners();
+  }
+
+  // Actualizar mascota (para adopción u otros cambios)
+  Future<void> updatePet(PetModel pet) async {
+    await _firestore.updatePet(pet);
+    notifyListeners();
+  }
+
+  // Adoptar mascota: cambia ownerId y marca como no adoptable
+  Future<void> adoptPet(String petId, String newOwnerId) async {
+    final pet = await _firestore.getPetById(petId);
+    pet.ownerId = newOwnerId;
+    pet.isAdoptable = false;
+    await _firestore.updatePet(pet);
+    notifyListeners();
   }
 
   // Eliminar mascota
   Future<void> deletePet(String id) async {
     await _firestore.deletePet(id);
+    notifyListeners();
   }
 }

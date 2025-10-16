@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/pet_provider.dart';
 
@@ -13,9 +15,19 @@ class AddPetScreen extends StatefulWidget {
 
 class _AddPetScreenState extends State<AddPetScreen> {
   final _formKey = GlobalKey<FormState>();
+
   final _nameController = TextEditingController();
+  final _breedController = TextEditingController();
+  final _colorController = TextEditingController();
+  final _weightController = TextEditingController();
+  final _descriptionController = TextEditingController();
+
   String _selectedSpecies = 'Perro';
+  String _selectedGender = 'Macho';
   String? _birthDate;
+
+  List<Map<String, dynamic>> _vaccines = [];
+  File? _petImage;
 
   final Map<String, String> speciesDescriptions = {
     'Perro': 'Compañero leal y protector 🐶',
@@ -30,6 +42,94 @@ class _AddPetScreenState extends State<AddPetScreen> {
     'Iguana': 'Silenciosa y observadora 🦎',
   };
 
+  // 📸 Seleccionar imagen
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery);
+    if (picked != null) {
+      setState(() => _petImage = File(picked.path));
+    }
+  }
+
+  // 🧬 Agregar vacuna
+  void _addVaccine() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final _vaccineNameController = TextEditingController();
+        DateTime? _vaccineDate;
+
+        return AlertDialog(
+          title: const Text("Agregar vacuna 💉"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _vaccineNameController,
+                decoration: const InputDecoration(labelText: "Nombre de la vacuna"),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final pickedDate = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2035),
+                  );
+                  if (pickedDate != null) {
+                    setState(() => _vaccineDate = pickedDate);
+                  }
+                },
+                icon: const Icon(Icons.calendar_today),
+                label: Text(_vaccineDate == null
+                    ? 'Seleccionar fecha'
+                    : "${_vaccineDate!.day}/${_vaccineDate!.month}/${_vaccineDate!.year}"),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: const Text("Cancelar"),
+              onPressed: () => Navigator.pop(context),
+            ),
+            ElevatedButton(
+              child: const Text("Agregar"),
+              onPressed: () {
+                if (_vaccineNameController.text.isNotEmpty && _vaccineDate != null) {
+                  setState(() {
+                    _vaccines.add({
+                      'name': _vaccineNameController.text,
+                      'date': "${_vaccineDate!.day}/${_vaccineDate!.month}/${_vaccineDate!.year}",
+                    });
+                  });
+                  Navigator.pop(context);
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 🗓️ Seleccionar fecha de nacimiento
+  Future<void> _selectDate() async {
+    DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null) {
+      setState(() {
+        _birthDate =
+            "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+      });
+    }
+  }
+
+  // 🐾 Guardar mascota
   void _addPet() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -41,7 +141,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
       name: _nameController.text.trim(),
       species: _selectedSpecies,
       birthDate: _birthDate,
-      vaccines: [],
+      vaccines: _vaccines,
       appointments: [],
     );
 
@@ -58,21 +158,6 @@ class _AddPetScreenState extends State<AddPetScreen> {
     Navigator.pop(context);
   }
 
-  Future<void> _selectDate() async {
-    DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2030),
-    );
-    if (picked != null) {
-      setState(() {
-        _birthDate =
-            "${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -85,18 +170,34 @@ class _AddPetScreenState extends State<AddPetScreen> {
         child: Form(
           key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // 📸 Imagen
+              GestureDetector(
+                onTap: _pickImage,
+                child: CircleAvatar(
+                  radius: 60,
+                  backgroundColor: Colors.teal.shade100,
+                  backgroundImage:
+                      _petImage != null ? FileImage(_petImage!) : const AssetImage('assets/icons/default_pet.png') as ImageProvider,
+                  child: _petImage == null
+                      ? const Icon(Icons.add_a_photo, color: Colors.teal, size: 35)
+                      : null,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 🐾 Nombre
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
                   labelText: 'Nombre de la mascota',
                   border: OutlineInputBorder(),
                 ),
-                validator: (value) =>
-                    value == null || value.isEmpty ? 'Ingresa un nombre' : null,
+                validator: (value) => value == null || value.isEmpty ? 'Ingresa un nombre' : null,
               ),
               const SizedBox(height: 20),
+
+              // 🐶 Especie
               DropdownButtonFormField<String>(
                 value: _selectedSpecies,
                 decoration: const InputDecoration(
@@ -104,10 +205,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
                   border: OutlineInputBorder(),
                 ),
                 items: speciesDescriptions.keys
-                    .map((species) => DropdownMenuItem(
-                          value: species,
-                          child: Text(species),
-                        ))
+                    .map((species) => DropdownMenuItem(value: species, child: Text(species)))
                     .toList(),
                 onChanged: (value) {
                   setState(() => _selectedSpecies = value!);
@@ -116,20 +214,54 @@ class _AddPetScreenState extends State<AddPetScreen> {
               const SizedBox(height: 8),
               Text(
                 speciesDescriptions[_selectedSpecies] ?? '',
-                style: GoogleFonts.poppins(
-                  fontStyle: FontStyle.italic,
-                  color: Colors.grey[700],
-                ),
+                style: GoogleFonts.poppins(fontStyle: FontStyle.italic, color: Colors.grey[700]),
               ),
               const SizedBox(height: 20),
+
+              // ⚤ Género
+              DropdownButtonFormField<String>(
+                value: _selectedGender,
+                decoration: const InputDecoration(
+                  labelText: 'Género',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'Macho', child: Text('Macho')),
+                  DropdownMenuItem(value: 'Hembra', child: Text('Hembra')),
+                ],
+                onChanged: (value) => setState(() => _selectedGender = value!),
+              ),
+              const SizedBox(height: 20),
+
+              // 🧬 Raza
+              TextFormField(
+                controller: _breedController,
+                decoration: const InputDecoration(labelText: 'Raza', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 20),
+
+              // 🎨 Color
+              TextFormField(
+                controller: _colorController,
+                decoration: const InputDecoration(labelText: 'Color', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 20),
+
+              // ⚖️ Peso
+              TextFormField(
+                controller: _weightController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Peso (kg)', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 20),
+
+              // 📅 Fecha de nacimiento
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
                     child: Text(
-                      _birthDate == null
-                          ? 'Selecciona la fecha de nacimiento'
-                          : 'Nacimiento: $_birthDate',
+                      _birthDate == null ? 'Selecciona fecha de nacimiento' : 'Nacimiento: $_birthDate',
                       style: GoogleFonts.poppins(),
                     ),
                   ),
@@ -139,21 +271,46 @@ class _AddPetScreenState extends State<AddPetScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 20),
+
+              // 💉 Vacunas
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Vacunas registradas:', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                  IconButton(icon: const Icon(Icons.add, color: Colors.teal), onPressed: _addVaccine),
+                ],
+              ),
+              if (_vaccines.isEmpty)
+                const Text('Aún no has agregado vacunas.')
+              else
+                ..._vaccines.map(
+                  (v) => ListTile(
+                    leading: const Icon(Icons.health_and_safety, color: Colors.green),
+                    title: Text(v['name']),
+                    subtitle: Text('Fecha: ${v['date']}'),
+                  ),
+                ),
+
+              const SizedBox(height: 20),
+
+              // 📝 Descripción
+              TextFormField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(labelText: 'Descripción', border: OutlineInputBorder()),
+                maxLines: 3,
+              ),
               const SizedBox(height: 30),
+
+              // 🐾 Botón guardar
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.teal,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 ),
                 icon: const Icon(Icons.pets),
-                label: Text(
-                  'Guardar Mascota',
-                  style: GoogleFonts.poppins(fontSize: 16),
-                ),
+                label: Text('Guardar Mascota', style: GoogleFonts.poppins(fontSize: 16)),
                 onPressed: _addPet,
               ),
             ],
