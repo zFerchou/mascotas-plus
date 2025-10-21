@@ -19,6 +19,7 @@ dependencies:
   flutter_lints: ^6.0.0
   google_fonts: ^6.3.2
   image_picker: ^1.2.0
+  firebase_storage: ^12.4.10
 
 dev_dependencies:
   flutter_test:
