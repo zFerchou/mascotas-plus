@@ -5,6 +5,7 @@ import 'app.dart';
 import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'providers/pet_provider.dart';
+import 'providers/message_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +19,7 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => PetProvider()),
+        ChangeNotifierProvider(create: (_) => MessageProvider()), 
       ],
       child: const App(),
     ),
