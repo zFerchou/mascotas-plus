@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/pet_provider.dart';
 import '../../models/pet_model.dart';
@@ -32,6 +33,309 @@ class _AdoptPetScreenState extends State<AdoptPetScreen> {
     'Caballo': Colors.deepOrange.shade100,
     'Iguana': Colors.lightGreen.shade100,
   };
+
+  // ✅ NUEVO: Mostrar información del dueño
+  void _showOwnerInfo(PetModel pet) async {
+    // Mostrar loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // Obtener información del dueño desde Firestore
+      final userDoc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(pet.ownerId)
+          .get();
+
+      // Cerrar loading
+      Navigator.pop(context);
+
+      if (!userDoc.exists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo encontrar la información del dueño')),
+        );
+        return;
+      }
+
+      final userData = userDoc.data()!;
+      final showContactInfo = userData['showContactInfo'] ?? false;
+
+      // Mostrar modal con información del dueño
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => _buildOwnerInfoModal(userData, showContactInfo, pet),
+      );
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al cargar información: $e')),
+      );
+    }
+  }
+
+  // ✅ NUEVO: Modal de información del dueño
+  Widget _buildOwnerInfoModal(Map<String, dynamic> userData, bool showContactInfo, PetModel pet) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.5,
+      maxChildSize: 0.9,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(25),
+              topRight: Radius.circular(25),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Center(
+                  child: Container(
+                    width: 60,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                
+                Text(
+                  'Información del Dueño 🏠',
+                  style: GoogleFonts.poppins(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green.shade800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                
+                Text(
+                  'Persona que ofrece a ${pet.name} en adopción',
+                  style: GoogleFonts.poppins(
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                
+                Expanded(
+                  child: ListView(
+                    controller: scrollController,
+                    children: [
+                      // Información básica siempre visible
+                      _buildOwnerInfoItem(
+                        icon: Icons.person,
+                        title: 'Nombre',
+                        value: userData['name'] ?? 'No especificado',
+                      ),
+                      
+                      _buildOwnerInfoItem(
+                        icon: Icons.pets,
+                        title: 'Experiencia con mascotas',
+                        value: userData['experienceYears'] != null 
+                            ? '${userData['experienceYears']} años de experiencia' 
+                            : 'No especificada',
+                      ),
+                      
+                      if (userData['bio'] != null && userData['bio'].isNotEmpty)
+                        _buildOwnerInfoItem(
+                          icon: Icons.description,
+                          title: 'Sobre el dueño',
+                          value: userData['bio'],
+                        ),
+                      
+                      const SizedBox(height: 20),
+                      
+                      // Información de contacto (depende de la configuración de privacidad)
+                      if (showContactInfo) ...[
+                        Text(
+                          'Información de Contacto:',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        
+                        if (userData['phone'] != null && userData['phone'].isNotEmpty)
+                          _buildOwnerInfoItem(
+                            icon: Icons.phone,
+                            title: 'Teléfono',
+                            value: userData['phone'],
+                          ),
+                        
+                        if (userData['city'] != null && userData['city'].isNotEmpty)
+                          _buildOwnerInfoItem(
+                            icon: Icons.location_city,
+                            title: 'Ciudad',
+                            value: userData['city'],
+                          ),
+                        
+                        if (userData['address'] != null && userData['address'].isNotEmpty)
+                          _buildOwnerInfoItem(
+                            icon: Icons.home,
+                            title: 'Dirección',
+                            value: userData['address'],
+                          ),
+                        
+                        const SizedBox(height: 20),
+                        
+                        // Botones de acción
+                        Row(
+                          children: [
+                            if (userData['phone'] != null && userData['phone'].isNotEmpty)
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    // Aquí puedes implementar la llamada telefónica
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Llamar a ${userData['phone']}')),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.phone, size: 18),
+                                  label: const Text('Llamar'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            
+                            if (userData['phone'] != null && userData['phone'].isNotEmpty) 
+                              const SizedBox(width: 10),
+                            
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  // Aquí puedes implementar el envío de mensaje
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Enviar mensaje')),
+                                  );
+                                },
+                                icon: const Icon(Icons.message, size: 18),
+                                label: const Text('Mensaje'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        // Mensaje cuando la información está privada
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.lock_outline, color: Colors.grey),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'El dueño ha configurado su información de contacto como privada. '
+                                  'Puedes contactarlo a través de los botones de mensaje si comparte su teléfono.',
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      
+                      const SizedBox(height: 20),
+                      
+                      // Información adicional
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '💡 Consejo para la adopción:',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.green.shade800,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '• Coordina una visita para conocer a ${pet.name}\n'
+                              '• Pregunta sobre sus hábitos y cuidados\n'
+                              '• Asegúrate de tener todo listo para su llegada\n'
+                              '• Sé paciente durante el periodo de adaptación',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                color: Colors.green.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ✅ NUEVO: Item de información del dueño
+  Widget _buildOwnerInfoItem({
+    required IconData icon,
+    required String title,
+    required String value,
+  }) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.green.withOpacity(0.1),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, size: 20, color: Colors.green),
+      ),
+      title: Text(
+        title,
+        style: GoogleFonts.poppins(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: Colors.grey.shade700,
+        ),
+      ),
+      subtitle: Text(
+        value,
+        style: GoogleFonts.poppins(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: Colors.black87,
+        ),
+      ),
+    );
+  }
 
   // ✅ NUEVO: Mostrar detalles de mascota antes de adoptar
   void _showPetDetailsModal(PetModel pet) {
@@ -67,6 +371,15 @@ class _AdoptPetScreenState extends State<AdoptPetScreen> {
             ],
             if (pet.imageUrl != null) 
               const Text('✅ Incluye foto'),
+            const SizedBox(height: 10),
+            Text(
+              '💡 Te recomendamos contactar al dueño primero',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.green.shade700,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
           ],
         ),
         actions: [
@@ -274,7 +587,7 @@ class _AdoptPetScreenState extends State<AdoptPetScreen> {
     );
   }
 
-  // ✅ NUEVO: Tarjeta moderna para mascotas adoptables
+  // ✅ NUEVO: Tarjeta moderna para mascotas adoptables CON BOTÓN DE CONTACTO
   Widget _buildAdoptablePetCard(PetModel pet, PetProvider petProvider) {
     final emoji = _speciesEmojis[pet.species] ?? '🐾';
     final color = _speciesColors[pet.species] ?? Colors.green.shade100;
@@ -329,14 +642,15 @@ class _AdoptPetScreenState extends State<AdoptPetScreen> {
                       left: 0,
                       right: 0,
                       child: Container(
-                        height: 100,
+                        height: 120, // Aumentado para los botones
                         decoration: BoxDecoration(
                           borderRadius: const BorderRadius.vertical(
                             bottom: Radius.circular(20),
                           ),
                           gradient: LinearGradient(
                             colors: [
-                              Colors.black.withOpacity(0.8),
+                              Colors.black.withOpacity(0.9),
+                              Colors.black.withOpacity(0.6),
                               Colors.transparent,
                             ],
                             begin: Alignment.bottomCenter,
@@ -348,7 +662,7 @@ class _AdoptPetScreenState extends State<AdoptPetScreen> {
                     
                     // Información de la mascota
                     Positioned(
-                      bottom: 0,
+                      bottom: 50, // Ajustado para los botones
                       left: 0,
                       right: 0,
                       child: Container(
@@ -378,29 +692,60 @@ class _AdoptPetScreenState extends State<AdoptPetScreen> {
                                 fontSize: 14,
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            // Botón de adopción
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: () => _showAdoptionConfirmation(pet),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                                icon: const Icon(Icons.pets, size: 16),
-                                label: const Text(
-                                  'Adoptar',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                              ),
-                            ),
                           ],
                         ),
+                      ),
+                    ),
+                    
+                    // ✅ NUEVO: Botones de acción
+                    Positioned(
+                      bottom: 8,
+                      left: 8,
+                      right: 8,
+                      child: Column(
+                        children: [
+                          // Botón de contacto
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () => _showOwnerInfo(pet),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white.withOpacity(0.9),
+                                foregroundColor: Colors.green.shade700,
+                                padding: const EdgeInsets.symmetric(vertical: 6),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              icon: const Icon(Icons.contact_page, size: 14),
+                              label: const Text(
+                                'Contactar Dueño',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          // Botón de adopción
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () => _showAdoptionConfirmation(pet),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 6),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              icon: const Icon(Icons.pets, size: 14),
+                              label: const Text(
+                                'Adoptar',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     
@@ -448,7 +793,7 @@ class _AdoptPetScreenState extends State<AdoptPetScreen> {
     );
   }
 
-  // ✅ NUEVO: Modal de detalles de mascota
+  // ✅ NUEVO: Modal de detalles de mascota ACTUALIZADO
   Widget _buildPetDetailModal(PetModel pet) {
     final emoji = _speciesEmojis[pet.species] ?? '🐾';
     final color = _speciesColors[pet.species] ?? Colors.green.shade100;
@@ -537,18 +882,40 @@ class _AdoptPetScreenState extends State<AdoptPetScreen> {
                             ],
                           ),
                         ),
-                        ElevatedButton.icon(
-                          onPressed: () => _showAdoptionConfirmation(pet),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                        // ✅ NUEVO: Botón de contacto en el modal también
+                        Column(
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(context); // Cerrar este modal
+                                _showOwnerInfo(pet); // Abrir modal del dueño
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              icon: const Icon(Icons.contact_page, size: 16),
+                              label: const Text('Dueño'),
                             ),
-                          ),
-                          icon: const Icon(Icons.pets),
-                          label: const Text('Adoptar'),
+                            const SizedBox(height: 8),
+                            ElevatedButton.icon(
+                              onPressed: () => _showAdoptionConfirmation(pet),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              icon: const Icon(Icons.pets),
+                              label: const Text('Adoptar'),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -587,11 +954,11 @@ class _AdoptPetScreenState extends State<AdoptPetScreen> {
                     
                     const SizedBox(height: 20),
                     const Text(
-                      '¡Dale un hogar lleno de amor! ❤️',
+                      '💡 Contacta al dueño para conocer más detalles y coordinar la adopción',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                         color: Colors.green,
                       ),
                     ),
