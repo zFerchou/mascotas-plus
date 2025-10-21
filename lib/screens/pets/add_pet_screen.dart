@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/pet_provider.dart';
+import 'package:flutter/foundation.dart'; // Para kIsWeb
 
 class AddPetScreen extends StatefulWidget {
   const AddPetScreen({super.key});
@@ -28,6 +29,7 @@ class _AddPetScreenState extends State<AddPetScreen> {
 
   List<Map<String, dynamic>> _vaccines = [];
   File? _petImage;
+  String? _petImageUrl; // Para web
 
   final Map<String, String> speciesDescriptions = {
     'Perro': 'Compañero leal y protector 🐶',
@@ -42,12 +44,65 @@ class _AddPetScreenState extends State<AddPetScreen> {
     'Iguana': 'Silenciosa y observadora 🦎',
   };
 
-  // 📸 Seleccionar imagen
+  // 📸 Seleccionar imagen - COMPATIBLE CON WEB
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery);
+    
     if (picked != null) {
-      setState(() => _petImage = File(picked.path));
+      setState(() {
+        // Para web usamos la URL, para móvil el File
+        if (kIsWeb) {
+          _petImageUrl = picked.path;
+          _petImage = null;
+        } else {
+          _petImage = File(picked.path);
+          _petImageUrl = null;
+        }
+      });
+    }
+  }
+
+  // Método auxiliar para la imagen por defecto
+  Widget _buildDefaultImage() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.add_a_photo, color: Colors.teal, size: 35),
+        SizedBox(height: 5),
+        Text('Agregar foto', 
+            style: TextStyle(color: Colors.teal, fontSize: 12))
+      ],
+    );
+  }
+
+  // Widget de imagen compatible con web y móvil
+  Widget _buildPetImage() {
+    if (kIsWeb && _petImageUrl != null) {
+      // Para Web
+      return Image.network(
+        _petImageUrl!,
+        fit: BoxFit.cover,
+        width: 120,
+        height: 120,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildDefaultImage();
+        },
+      );
+    } else if (!kIsWeb && _petImage != null) {
+      // Para Móvil
+      return Image.file(
+        _petImage!,
+        fit: BoxFit.cover,
+        width: 120,
+        height: 120,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildDefaultImage();
+        },
+      );
+    } else {
+      // Sin imagen
+      return _buildDefaultImage();
     }
   }
 
@@ -171,17 +226,19 @@ class _AddPetScreenState extends State<AddPetScreen> {
           key: _formKey,
           child: Column(
             children: [
-              // 📸 Imagen
+              // 📸 Imagen - COMPATIBLE CON WEB Y MÓVIL
               GestureDetector(
                 onTap: _pickImage,
-                child: CircleAvatar(
-                  radius: 60,
-                  backgroundColor: Colors.teal.shade100,
-                  backgroundImage:
-                      _petImage != null ? FileImage(_petImage!) : const AssetImage('assets/icons/default_pet.png') as ImageProvider,
-                  child: _petImage == null
-                      ? const Icon(Icons.add_a_photo, color: Colors.teal, size: 35)
-                      : null,
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: Colors.teal.shade100,
+                    shape: BoxShape.circle,
+                  ),
+                  child: ClipOval(
+                    child: _buildPetImage(), // Widget adaptativo
+                  ),
                 ),
               ),
               const SizedBox(height: 20),

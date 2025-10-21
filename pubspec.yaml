@@ -26,3 +26,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # 👇 Agrega tus recursos aquí
+  assets:
+    - assets/icons/
